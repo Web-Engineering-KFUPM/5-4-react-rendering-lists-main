@@ -29,8 +29,8 @@ The lab is divided into **four tasks**:
 
 Before starting, review the following ZyBooks sections:
 
-- [**5.10 Conditional Rendering**](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/10)  
-- [**5.11 Lists (React)**](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/11)
+- 5.10 Conditional Rendering  
+- 5.11 Lists (React)
 
 These sections explain the key concepts used in this lab.
 
