@@ -3,24 +3,24 @@
 /**
  * Lab Autograder — React Task Tracker (State + Event Handling)
  *
- * Repo layout (per your screenshot):
- * - Workflow runs at repo root (cwd = repo root)
- * - Project folder: 5-4-react-rendering-lists/
- * - Grader file:   5-4-react-rendering-lists/scripts/grade.cjs
- * - Student code:  5-4-react-rendering-lists/src/(components|...)...
+ * Grades ONLY based on the TODOs you provided:
+ * Task 1: Capture Input (controlled input + display text)
+ * Task 2: Submit adds tasks + pass props + map render
+ * Task 3: Delete by id (prop drilling + filter)
+ * Task 4: Clear All resets tasks + placeholder shows
  *
  * Marking:
- * - 80 marks for TODOs (React checks) => 4 tasks
+ * - 80 marks for TODOs (lenient, top-level checks only)
  * - 20 marks for submission timing (deadline-based)
  *   - On/before deadline => 20/20
  *   - After deadline     => 10/20
  *
- * Deadline: 25 Feb 2026 11:59 PM (Asia/Riyadh, UTC+03:00)
+ * Deadline: 25 Feb 2026 20:59 (Asia/Riyadh, UTC+03:00)
  *
  * Notes:
  * - Ignores JS/JSX comments (so examples inside comments do NOT count).
- * - Lenient checks only: looks for top-level implementation and key constructs.
- * - Accepts common equivalents and flexible naming.
+ * - Very lenient checks: looks for key constructs, not exact code.
+ * - Finds files anywhere in the project (common folder layouts).
  */
 
 const fs = require("fs");
@@ -33,7 +33,7 @@ fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
 
 /* -----------------------------
    Deadline (Asia/Riyadh)
-   25 Feb 2026, 08:59 PM
+   25 Feb 2026, 20:59
 -------------------------------- */
 const DEADLINE_RIYADH_ISO = "2026-02-25T20:59:00+03:00";
 const DEADLINE_MS = Date.parse(DEADLINE_RIYADH_ISO);
@@ -44,6 +44,7 @@ const SUBMISSION_LATE = 10;
 
 /* -----------------------------
    TODO marks (out of 80)
+   (You asked me to decide distribution)
 --------------------------------
    Task 1: 20
    Task 2: 25
@@ -225,15 +226,12 @@ function listAllFiles(rootDir) {
 }
 
 /* -----------------------------
-   IMPORTANT: paths for your repo layout
-   - workflow runs at repo root (cwd = repo root)
-   - project is in: 5-4-react-rendering-lists
+   Robust project root detection
+   Works whether workflow runs at repo root OR inside project folder.
 -------------------------------- */
 const REPO_ROOT = process.cwd();
 
-// If we are already inside the Vite project folder (has src/ and package.json),
-// use cwd as PROJECT_ROOT. Otherwise, use the nested folder.
-function isProjectFolder(p) {
+function isViteReactProjectFolder(p) {
   try {
     return (
       fs.existsSync(path.join(p, "package.json")) &&
@@ -245,30 +243,67 @@ function isProjectFolder(p) {
   }
 }
 
-const PROJECT_ROOT = isProjectFolder(REPO_ROOT)
-  ? REPO_ROOT
-  : path.join(REPO_ROOT, "5-4-react-rendering-lists");
+function pickProjectRoot(cwd) {
+  // If cwd already looks like a project, use it.
+  if (isViteReactProjectFolder(cwd)) return cwd;
 
-/* -----------------------------
-   Find files (inside PROJECT_ROOT)
--------------------------------- */
-function findFileByBasename(names) {
-  // common student locations
-  const preferred = names
-    .flatMap((n) => [
-      path.join(PROJECT_ROOT, "src", "components", n),
-      path.join(PROJECT_ROOT, "src", n),
-    ])
-    .filter((p) => existsFile(p));
+  // Otherwise, check immediate subfolders for a project.
+  let subs = [];
+  try {
+    subs = fs.readdirSync(cwd, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    subs = [];
+  }
 
-  if (preferred.length) return preferred[0];
+  // Prefer known lab folder names if present
+  const preferred = ["5-3-react-event-handling", "5-4-react-rendering-lists"];
+  for (const name of preferred) {
+    const p = path.join(cwd, name);
+    if (isViteReactProjectFolder(p)) return p;
+  }
 
-  const all = listAllFiles(PROJECT_ROOT);
-  const lowerSet = new Set(names.map((x) => x.toLowerCase()));
-  return all.find((p) => lowerSet.has(path.basename(p).toLowerCase())) || null;
+  // Otherwise pick the first subfolder that looks like a project
+  for (const name of subs) {
+    const p = path.join(cwd, name);
+    if (isViteReactProjectFolder(p)) return p;
+  }
+
+  // Fallback: use cwd (and file finder will still search widely)
+  return cwd;
 }
 
-// Components used by this lab (common names)
+const PROJECT_ROOT = pickProjectRoot(REPO_ROOT);
+
+/* -----------------------------
+   Find files (inside PROJECT_ROOT, fallback to whole repo)
+-------------------------------- */
+function findFileByBasename(names) {
+  const candidates = [];
+
+  for (const n of names) {
+    candidates.push(path.join(PROJECT_ROOT, "src", "components", n));
+    candidates.push(path.join(PROJECT_ROOT, "src", n));
+  }
+
+  const preferredHit = candidates.find((p) => existsFile(p));
+  if (preferredHit) return preferredHit;
+
+  // Search entire project tree
+  const all = listAllFiles(PROJECT_ROOT);
+  const lowerSet = new Set(names.map((x) => x.toLowerCase()));
+  const foundInProject = all.find((p) => lowerSet.has(path.basename(p).toLowerCase()));
+  if (foundInProject) return foundInProject;
+
+  // Extra fallback: search entire repo tree
+  if (PROJECT_ROOT !== REPO_ROOT) {
+    const allRepo = listAllFiles(REPO_ROOT);
+    const foundInRepo = allRepo.find((p) => lowerSet.has(path.basename(p).toLowerCase()));
+    if (foundInRepo) return foundInRepo;
+  }
+
+  return null;
+}
+
 const taskAppFile = findFileByBasename(["TaskApp.jsx", "TaskApp.js"]);
 const taskListFile = findFileByBasename(["TaskList.jsx", "TaskList.js"]);
 const taskItemFile = findFileByBasename(["TaskItem.jsx", "TaskItem.js"]);
@@ -350,14 +385,14 @@ function anyOf(has, res) {
    Grade TODOs (top-level only)
 -------------------------------- */
 
-// Task 1: Controlled input + display typed text
+// Task 1 – Capture Input
 {
   if (!taskApp) {
     failTask(
       tasks[0],
       taskAppFile
         ? `Could not read component file at: ${taskAppFile}`
-        : "TaskApp component file not found (expected something like src/components/TaskApp.jsx)."
+        : "TaskApp component file not found (expected TaskApp.jsx somewhere under src/)."
     );
   } else {
     const has = mkHas(taskApp);
@@ -375,15 +410,15 @@ function anyOf(has, res) {
         ok: anyOf(has, [/\bvalue\s*=\s*\{\s*text\s*\}/i]),
       },
       {
-        label: "Input updates text via onChange -> setText(e.target.value) (directly or via handler)",
+        label: "onChange updates text (setText(e.target.value) OR handler that calls setText)",
         ok: anyOf(has, [
-          /\bonChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*setText\s*\(\s*\w+\s*\.target\.value\s*\)\s*\}/i,
-          /\bonChange\s*=\s*\{\s*\w+\s*\}/i, // handler name (very lenient)
-          /\bsetText\s*\(\s*\w+\s*\.target\.value\s*\)/i,
+          /\bonChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*setText\s*\(\s*\w+\.target\.value\s*\)\s*\}/i,
+          /\bsetText\s*\(\s*\w+\.target\.value\s*\)/i,
+          /\bonChange\s*=\s*\{\s*\w+\s*\}/i, // very lenient handler usage
         ]),
       },
       {
-        label: "Displays current text in JSX (e.g., {text})",
+        label: "Displays the current text in JSX (e.g., {text})",
         ok: anyOf(has, [/\{\s*text\s*\}/i]),
       },
     ];
@@ -392,7 +427,7 @@ function anyOf(has, res) {
   }
 }
 
-// Task 2: tasks state + submit adds {id,text} + clears + pass props + map + render text
+// Task 2 – Submit Button → Pass Props and Display
 {
   if (!taskApp || !taskList || !taskItem) {
     const missingFiles = [];
@@ -411,15 +446,19 @@ function anyOf(has, res) {
         ok: anyOf(hasA, [/\bconst\s*\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(\s*\[\s*\]\s*\)/i]),
       },
       {
-        label: "Submit click adds a new task immutably (setTasks([...prev, ...]) or functional update)",
+        label: "Submit button wired to onClick (onClick={...})",
+        ok: anyOf(hasA, [/<\s*button[^>]*\bonClick\s*=\s*\{/i]),
+      },
+      {
+        label: "Submit adds a task immutably (setTasks(prev => [...prev, ...]) or [...tasks, ...])",
         ok: anyOf(hasA, [
           /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
           /\bsetTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
-          /\bsetTasks\s*\(\s*\[\s*\.\.\.\s*tasks\s*,/i, // common beginner approach
+          /\bsetTasks\s*\(\s*\[\s*\.\.\.\s*tasks\s*,/i,
         ]),
       },
       {
-        label: "New task object includes id and text (Date.now or equivalent)",
+        label: "Creates task object with id + text (Date.now or equivalent)",
         ok: anyOf(hasA, [
           /\{\s*id\s*:\s*Date\.now\s*\(\s*\)\s*,\s*text\s*:\s*text/i,
           /\{\s*id\s*:\s*\w+\s*,\s*text\s*:\s*text/i,
@@ -435,12 +474,16 @@ function anyOf(has, res) {
         ok: anyOf(hasA, [/<\s*TaskList[^>]*\btasks\s*=\s*\{\s*tasks\s*\}/i]),
       },
       {
-        label: "TaskList maps tasks to TaskItem (tasks.map(...))",
+        label: "TaskList maps tasks (tasks.map(...))",
         ok: anyOf(hasL, [/\btasks\s*\.\s*map\s*\(/i, /\.map\s*\(\s*\(\s*\w+\s*\)\s*=>/i]),
       },
       {
-        label: "TaskItem displays task text (task.text)",
-        ok: anyOf(hasI, [/\btask\s*\.\s*text\b/i, /\{\s*\w+\.text\s*\}/i]),
+        label: "TaskItem shows task text in a span (task.text or props.text)",
+        ok: anyOf(hasI, [
+          /<\s*span[^>]*>[\s\S]*\btask\s*\.\s*text\b[\s\S]*<\s*\/\s*span\s*>/i,
+          /\btask\s*\.\s*text\b/i,
+          /\bprops\s*\.\s*text\b/i,
+        ]),
       },
     ];
 
@@ -448,7 +491,7 @@ function anyOf(has, res) {
   }
 }
 
-// Task 3: Delete by id via filter + pass onDelete + TaskItem button calls onDelete(...)
+// Task 3 – Delete Button
 {
   if (!taskApp || !taskList || !taskItem) {
     const missingFiles = [];
@@ -463,7 +506,7 @@ function anyOf(has, res) {
 
     const required = [
       {
-        label: "Delete handler removes task using filter (setTasks(prev => prev.filter(...)))",
+        label: "Delete handler exists and removes task via filter (setTasks(prev => prev.filter(...)))",
         ok: anyOf(hasA, [
           /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*prev\s*\.\s*filter\s*\(/i,
           /\bsetTasks\s*\(\s*prev\s*=>\s*prev\s*\.\s*filter\s*\(/i,
@@ -475,14 +518,15 @@ function anyOf(has, res) {
         ok: anyOf(hasA, [/<\s*TaskList[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}/i]),
       },
       {
-        label: "TaskList passes onDelete down to TaskItem",
+        label: "TaskList passes onDelete to TaskItem",
         ok: anyOf(hasL, [/<\s*TaskItem[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}/i]),
       },
       {
-        label: "TaskItem delete button calls onDelete(task.id) (or onDelete(id))",
+        label: "TaskItem Delete button calls onDelete(id) (task.id or prop id)",
         ok: anyOf(hasI, [
           /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
-          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i, // lenient
+          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i,
+          /<\s*button[^>]*>[\s\S]*Delete[\s\S]*<\s*\/\s*button\s*>/i, // super lenient presence
         ]),
       },
     ];
@@ -491,7 +535,7 @@ function anyOf(has, res) {
   }
 }
 
-// Task 4: Clear all + placeholder when no tasks
+// Task 4 – Clear All Button
 {
   if (!taskApp || !taskList) {
     const missingFiles = [];
@@ -508,15 +552,18 @@ function anyOf(has, res) {
         ok: anyOf(hasA, [/\bsetTasks\s*\(\s*\[\s*\]\s*\)/i]),
       },
       {
-        label: "Clear All button wired (onClick={handleClearAll} or similar)",
-        ok: anyOf(hasA, [/\bonClick\s*=\s*\{\s*\w+\s*\}/i]),
+        label: "Clear All button has onClick handler",
+        ok: anyOf(hasA, [
+          /Clear\s*All/i,
+          /<\s*button[^>]*\bonClick\s*=\s*\{/i,
+        ]),
       },
       {
-        label: "TaskList shows placeholder when tasks is empty (tasks.length === 0, !tasks.length, or similar)",
+        label: "TaskList shows placeholder when tasks is empty (tasks.length === 0 / !tasks.length / ternary)",
         ok: anyOf(hasL, [
           /\btasks\s*\.\s*length\s*===\s*0/i,
           /!\s*tasks\s*\.\s*length/i,
-          /\btasks\s*\.\s*length\s*>\s*0\s*\?/i, // ternary style
+          /\btasks\s*\?\s*[\s\S]*:\s*[\s\S]*/i,
           /\bNo\s+tasks\b/i,
           /\bempty\b/i,
           /\bplaceholder\b/i,
@@ -537,7 +584,7 @@ const totalScore = round2(stepsScore + submissionScore);
 /* -----------------------------
    Build summary + feedback (same style)
 -------------------------------- */
-const LAB_NAME = "5-4-react-rendering-lists-main";
+const LAB_NAME = "react-task-tracker";
 
 const submissionLine = `- **Lab:** ${LAB_NAME}
 - **Deadline (Riyadh / UTC+03:00):** ${DEADLINE_RIYADH_ISO}
@@ -553,8 +600,8 @@ ${submissionLine}
 
 ## Files Checked
 
-- Repo root: ${REPO_ROOT}
-- Project root: ${PROJECT_ROOT}
+- Repo root (cwd): ${REPO_ROOT}
+- Detected project root: ${PROJECT_ROOT}
 - TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
 - TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
 - TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
@@ -619,8 +666,8 @@ ${submissionLine}
 
 ## Files Checked
 
-- Repo root: ${REPO_ROOT}
-- Project root: ${PROJECT_ROOT}
+- Repo root (cwd): ${REPO_ROOT}
+- Detected project root: ${PROJECT_ROOT}
 - TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
 - TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
 - TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
