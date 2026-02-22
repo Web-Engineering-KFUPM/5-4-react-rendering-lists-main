@@ -230,7 +230,24 @@ function listAllFiles(rootDir) {
    - project is in: 5-4-react-rendering-lists
 -------------------------------- */
 const REPO_ROOT = process.cwd();
-const PROJECT_ROOT = path.join(REPO_ROOT, "5-4-react-rendering-lists");
+
+// If we are already inside the Vite project folder (has src/ and package.json),
+// use cwd as PROJECT_ROOT. Otherwise, use the nested folder.
+function isProjectFolder(p) {
+  try {
+    return (
+      fs.existsSync(path.join(p, "package.json")) &&
+      fs.existsSync(path.join(p, "src")) &&
+      fs.statSync(path.join(p, "src")).isDirectory()
+    );
+  } catch {
+    return false;
+  }
+}
+
+const PROJECT_ROOT = isProjectFolder(REPO_ROOT)
+  ? REPO_ROOT
+  : path.join(REPO_ROOT, "5-4-react-rendering-lists");
 
 /* -----------------------------
    Find files (inside PROJECT_ROOT)
