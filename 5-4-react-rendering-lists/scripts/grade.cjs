@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Lab Autograder — React Task Tracker (State + Event Handling)
+ * Lab Autograder — Study Buddy (5-4 React Rendering Lists)
  *
- * Grades ONLY based on the TODOs you provided:
- * Task 1: Capture Input (controlled input + display text)
- * Task 2: Submit adds tasks + pass props + map render
- * Task 3: Delete by id (prop drilling + filter)
- * Task 4: Clear All resets tasks + placeholder shows
+ * Grades ONLY based on the TODOs you provided (top-level / lenient):
+ *  - TASK 1 (App.jsx): Render courses with courses.map -> <CourseCard ... />
+ *  - TASK 2 (CourseCard.jsx): Render tasks with course.tasks.map -> <TaskItem ... />
+ *  - TASK 3 (CourseCard.jsx, TaskItem.jsx, DueBadge.jsx): Conditional rendering (ONLY && in other files)
+ *  - TASK 4 (CourseCard.jsx, TaskItem.jsx): Interactivity (Toggle + Delete ONLY)
  *
  * Marking:
  * - 80 marks for TODOs (lenient, top-level checks only)
@@ -17,10 +17,15 @@
  *
  * Deadline: 25 Feb 2026 20:59 (Asia/Riyadh, UTC+03:00)
  *
+ * Repo layout (per your screenshot):
+ * - repo root contains .github/workflows/grade.yml
+ * - project folder: 5-4-react-rendering-lists/
+ * - grader file:   5-4-react-rendering-lists/scripts/grade.cjs
+ * - student files: 5-4-react-rendering-lists/src/...
+ *
  * Notes:
- * - Ignores JS/JSX comments (so examples inside comments do NOT count).
+ * - Ignores JS/JSX comments (so starter TODO comments do NOT count).
  * - Very lenient checks: looks for key constructs, not exact code.
- * - Finds files anywhere in the project (common folder layouts).
  */
 
 const fs = require("fs");
@@ -44,19 +49,13 @@ const SUBMISSION_LATE = 10;
 
 /* -----------------------------
    TODO marks (out of 80)
-   (You asked me to decide distribution)
---------------------------------
-   Task 1: 20
-   Task 2: 25
-   Task 3: 20
-   Task 4: 15
-   Total: 80
-*/
+   (simple, even distribution)
+-------------------------------- */
 const tasks = [
-  { id: "t1", name: "Task 1: Capture Input (controlled input + display text)", marks: 20 },
-  { id: "t2", name: "Task 2: Submit + Props + Display List (tasks state + map + render text)", marks: 25 },
-  { id: "t3", name: "Task 3: Delete Task (prop drilling + filter by id)", marks: 20 },
-  { id: "t4", name: "Task 4: Clear All + Placeholder (reset tasks + show placeholder)", marks: 15 },
+  { id: "t1", name: "Task 1: Render Courses (App.jsx map + CourseCard props)", marks: 20 },
+  { id: "t2", name: "Task 2: Render Tasks (CourseCard.jsx map + TaskItem props)", marks: 20 },
+  { id: "t3", name: "Task 3: Conditional Rendering (&& + DueBadge label logic)", marks: 20 },
+  { id: "t4", name: "Task 4: Interactivity (Toggle + Delete ONLY)", marks: 20 },
 ];
 
 const STEPS_MAX = tasks.reduce((sum, t) => sum + t.marks, 0); // 80
@@ -226,8 +225,7 @@ function listAllFiles(rootDir) {
 }
 
 /* -----------------------------
-   Robust project root detection
-   Works whether workflow runs at repo root OR inside project folder.
+   Project root detection (robust)
 -------------------------------- */
 const REPO_ROOT = process.cwd();
 
@@ -244,69 +242,55 @@ function isViteReactProjectFolder(p) {
 }
 
 function pickProjectRoot(cwd) {
-  // If cwd already looks like a project, use it.
+  // If action runs inside the project folder already
   if (isViteReactProjectFolder(cwd)) return cwd;
 
-  // Otherwise, check immediate subfolders for a project.
+  // Prefer the known lab folder name
+  const preferred = path.join(cwd, "5-4-react-rendering-lists");
+  if (isViteReactProjectFolder(preferred)) return preferred;
+
+  // Otherwise pick any subfolder that looks like a Vite React project
   let subs = [];
   try {
     subs = fs.readdirSync(cwd, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
   } catch {
     subs = [];
   }
-
-  // Prefer known lab folder names if present
-  const preferred = ["5-3-react-event-handling", "5-4-react-rendering-lists"];
-  for (const name of preferred) {
-    const p = path.join(cwd, name);
-    if (isViteReactProjectFolder(p)) return p;
-  }
-
-  // Otherwise pick the first subfolder that looks like a project
   for (const name of subs) {
     const p = path.join(cwd, name);
     if (isViteReactProjectFolder(p)) return p;
   }
 
-  // Fallback: use cwd (and file finder will still search widely)
+  // fallback
   return cwd;
 }
 
 const PROJECT_ROOT = pickProjectRoot(REPO_ROOT);
 
 /* -----------------------------
-   Find files (inside PROJECT_ROOT, fallback to whole repo)
+   Find files
 -------------------------------- */
 function findFileByBasename(names) {
-  const candidates = [];
+  // Common locations first
+  const preferred = names
+    .flatMap((n) => [
+      path.join(PROJECT_ROOT, "src", "components", n),
+      path.join(PROJECT_ROOT, "src", n),
+    ])
+    .filter((p) => existsFile(p));
+  if (preferred.length) return preferred[0];
 
-  for (const n of names) {
-    candidates.push(path.join(PROJECT_ROOT, "src", "components", n));
-    candidates.push(path.join(PROJECT_ROOT, "src", n));
-  }
-
-  const preferredHit = candidates.find((p) => existsFile(p));
-  if (preferredHit) return preferredHit;
-
-  // Search entire project tree
+  // Search entire project
   const all = listAllFiles(PROJECT_ROOT);
   const lowerSet = new Set(names.map((x) => x.toLowerCase()));
-  const foundInProject = all.find((p) => lowerSet.has(path.basename(p).toLowerCase()));
-  if (foundInProject) return foundInProject;
-
-  // Extra fallback: search entire repo tree
-  if (PROJECT_ROOT !== REPO_ROOT) {
-    const allRepo = listAllFiles(REPO_ROOT);
-    const foundInRepo = allRepo.find((p) => lowerSet.has(path.basename(p).toLowerCase()));
-    if (foundInRepo) return foundInRepo;
-  }
-
-  return null;
+  const found = all.find((p) => lowerSet.has(path.basename(p).toLowerCase()));
+  return found || null;
 }
 
-const taskAppFile = findFileByBasename(["TaskApp.jsx", "TaskApp.js"]);
-const taskListFile = findFileByBasename(["TaskList.jsx", "TaskList.js"]);
+const appFile = findFileByBasename(["App.jsx", "App.js"]);
+const courseCardFile = findFileByBasename(["CourseCard.jsx", "CourseCard.js"]);
 const taskItemFile = findFileByBasename(["TaskItem.jsx", "TaskItem.js"]);
+const dueBadgeFile = findFileByBasename(["DueBadge.jsx", "DueBadge.js"]);
 
 /* -----------------------------
    Determine submission time
@@ -318,7 +302,6 @@ try {
   lastCommitISO = execSync("git log -1 --format=%cI", { encoding: "utf8" }).trim();
   lastCommitMS = Date.parse(lastCommitISO);
 } catch {
-  // fallback (still grades, but treat as "now")
   lastCommitISO = new Date().toISOString();
   lastCommitMS = Date.now();
 }
@@ -330,17 +313,19 @@ const isLate = Number.isFinite(lastCommitMS) ? lastCommitMS > DEADLINE_MS : true
 const submissionScore = isLate ? SUBMISSION_LATE : SUBMISSION_MAX;
 
 /* -----------------------------
-   Load student files
+   Load & strip student files
 -------------------------------- */
-const taskAppRaw = taskAppFile ? safeRead(taskAppFile) : null;
-const taskListRaw = taskListFile ? safeRead(taskListFile) : null;
+const appRaw = appFile ? safeRead(appFile) : null;
+const courseCardRaw = courseCardFile ? safeRead(courseCardFile) : null;
 const taskItemRaw = taskItemFile ? safeRead(taskItemFile) : null;
+const dueBadgeRaw = dueBadgeFile ? safeRead(dueBadgeFile) : null;
 
-const taskApp = taskAppRaw ? stripJsComments(taskAppRaw) : null;
-const taskList = taskListRaw ? stripJsComments(taskListRaw) : null;
+const app = appRaw ? stripJsComments(appRaw) : null;
+const courseCard = courseCardRaw ? stripJsComments(courseCardRaw) : null;
 const taskItem = taskItemRaw ? stripJsComments(taskItemRaw) : null;
+const dueBadge = dueBadgeRaw ? stripJsComments(dueBadgeRaw) : null;
 
-const results = []; // { id, name, max, score, checklist[], deductions[] }
+const results = [];
 
 /* -----------------------------
    Result helpers
@@ -370,56 +355,54 @@ function failTask(task, reason) {
   });
 }
 
-/* -----------------------------
-   Light detection helpers
--------------------------------- */
 function mkHas(code) {
   return (re) => re.test(code);
 }
-
 function anyOf(has, res) {
   return res.some((r) => has(r));
 }
 
 /* -----------------------------
-   Grade TODOs (top-level only)
+   Grade TODOs
 -------------------------------- */
 
-// Task 1 – Capture Input
+// TASK 1 — App.jsx: courses.map -> CourseCard with props
 {
-  if (!taskApp) {
+  if (!app) {
     failTask(
       tasks[0],
-      taskAppFile
-        ? `Could not read component file at: ${taskAppFile}`
-        : "TaskApp component file not found (expected TaskApp.jsx somewhere under src/)."
+      appFile ? `Could not read App file at: ${appFile}` : "App.jsx not found under src/."
     );
   } else {
-    const has = mkHas(taskApp);
+    const has = mkHas(app);
 
     const required = [
       {
-        label: 'Creates text state with useState("") (or equivalent)',
+        label: "Uses courses.map(...) to render courses",
+        ok: anyOf(has, [/\bcourses\s*\.\s*map\s*\(/i]),
+      },
+      {
+        label: "Renders <CourseCard ... /> in the map",
+        ok: anyOf(has, [/<\s*CourseCard\b/i]),
+      },
+      {
+        label: "Passes key prop (key={course.id} or similar)",
         ok: anyOf(has, [
-          /\bconst\s*\[\s*text\s*,\s*setText\s*\]\s*=\s*useState\s*\(\s*["'`]\s*["'`]\s*\)/i,
-          /\buseState\s*\(\s*["'`]\s*["'`]\s*\)/i,
+          /<\s*CourseCard[^>]*\bkey\s*=\s*\{\s*\w+\.id\s*\}/i,
+          /\bkey\s*=\s*\{\s*\w+\.id\s*\}/i,
         ]),
       },
       {
-        label: "Input is controlled with value={text}",
-        ok: anyOf(has, [/\bvalue\s*=\s*\{\s*text\s*\}/i]),
+        label: "Passes course prop (course={course} or similar)",
+        ok: anyOf(has, [/<\s*CourseCard[^>]*\bcourse\s*=\s*\{\s*\w+\s*\}/i]),
       },
       {
-        label: "onChange updates text (setText(e.target.value) OR handler that calls setText)",
-        ok: anyOf(has, [
-          /\bonChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*setText\s*\(\s*\w+\.target\.value\s*\)\s*\}/i,
-          /\bsetText\s*\(\s*\w+\.target\.value\s*\)/i,
-          /\bonChange\s*=\s*\{\s*\w+\s*\}/i, // very lenient handler usage
-        ]),
+        label: "Passes index prop (index={idx} or similar)",
+        ok: anyOf(has, [/<\s*CourseCard[^>]*\bindex\s*=\s*\{\s*\w+\s*\}/i]),
       },
       {
-        label: "Displays the current text in JSX (e.g., {text})",
-        ok: anyOf(has, [/\{\s*text\s*\}/i]),
+        label: "Passes onMutateCourse prop (onMutateCourse={...})",
+        ok: anyOf(has, [/<\s*CourseCard[^>]*\bonMutateCourse\s*=\s*\{\s*\w+\s*\}/i]),
       },
     ];
 
@@ -427,62 +410,41 @@ function anyOf(has, res) {
   }
 }
 
-// Task 2 – Submit Button → Pass Props and Display
+// TASK 2 — CourseCard.jsx: course.tasks.map -> TaskItem with props
 {
-  if (!taskApp || !taskList || !taskItem) {
+  if (!courseCard || !taskItem) {
     const missingFiles = [];
-    if (!taskApp) missingFiles.push("TaskApp.jsx");
-    if (!taskList) missingFiles.push("TaskList.jsx");
+    if (!courseCard) missingFiles.push("CourseCard.jsx");
     if (!taskItem) missingFiles.push("TaskItem.jsx");
-    failTask(tasks[1], `Missing key React files: ${missingFiles.join(", ")}.`);
+    failTask(tasks[1], `Missing key files: ${missingFiles.join(", ")}.`);
   } else {
-    const hasA = mkHas(taskApp);
-    const hasL = mkHas(taskList);
-    const hasI = mkHas(taskItem);
+    const hasC = mkHas(courseCard);
 
     const required = [
       {
-        label: "Creates tasks state with useState([])",
-        ok: anyOf(hasA, [/\bconst\s*\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(\s*\[\s*\]\s*\)/i]),
+        label: "Uses course.tasks.map(...)",
+        ok: anyOf(hasC, [/\bcourse\s*\.\s*tasks\s*\.\s*map\s*\(/i]),
       },
       {
-        label: "Submit button wired to onClick (onClick={...})",
-        ok: anyOf(hasA, [/<\s*button[^>]*\bonClick\s*=\s*\{/i]),
+        label: "Renders <TaskItem ... /> inside the map",
+        ok: anyOf(hasC, [/<\s*TaskItem\b/i]),
       },
       {
-        label: "Submit adds a task immutably (setTasks(prev => [...prev, ...]) or [...tasks, ...])",
-        ok: anyOf(hasA, [
-          /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
-          /\bsetTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
-          /\bsetTasks\s*\(\s*\[\s*\.\.\.\s*tasks\s*,/i,
+        label: "Passes key={task.id} (or similar)",
+        ok: anyOf(hasC, [
+          /<\s*TaskItem[^>]*\bkey\s*=\s*\{\s*\w+\.id\s*\}/i,
+          /\bkey\s*=\s*\{\s*\w+\.id\s*\}/i,
         ]),
       },
       {
-        label: "Creates task object with id + text (Date.now or equivalent)",
-        ok: anyOf(hasA, [
-          /\{\s*id\s*:\s*Date\.now\s*\(\s*\)\s*,\s*text\s*:\s*text/i,
-          /\{\s*id\s*:\s*\w+\s*,\s*text\s*:\s*text/i,
-          /\bid\s*:\s*Date\.now/i,
-        ]),
+        label: "Passes task prop (task={task})",
+        ok: anyOf(hasC, [/<\s*TaskItem[^>]*\btask\s*=\s*\{\s*\w+\s*\}/i]),
       },
       {
-        label: "Clears input after submit (setText('') / setText(\"\"))",
-        ok: anyOf(hasA, [/\bsetText\s*\(\s*["'`]\s*["'`]\s*\)/i]),
-      },
-      {
-        label: "Passes tasks to TaskList as props (tasks={tasks})",
-        ok: anyOf(hasA, [/<\s*TaskList[^>]*\btasks\s*=\s*\{\s*tasks\s*\}/i]),
-      },
-      {
-        label: "TaskList maps tasks (tasks.map(...))",
-        ok: anyOf(hasL, [/\btasks\s*\.\s*map\s*\(/i, /\.map\s*\(\s*\(\s*\w+\s*\)\s*=>/i]),
-      },
-      {
-        label: "TaskItem shows task text in a span (task.text or props.text)",
-        ok: anyOf(hasI, [
-          /<\s*span[^>]*>[\s\S]*\btask\s*\.\s*text\b[\s\S]*<\s*\/\s*span\s*>/i,
-          /\btask\s*\.\s*text\b/i,
-          /\bprops\s*\.\s*text\b/i,
+        label: "Passes onToggle + onDelete props",
+        ok: anyOf(hasC, [
+          /<\s*TaskItem[^>]*\bonToggle\s*=\s*\{\s*\w+\s*\}[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}/i,
+          /<\s*TaskItem[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}[^>]*\bonToggle\s*=\s*\{\s*\w+\s*\}/i,
         ]),
       },
     ];
@@ -491,43 +453,61 @@ function anyOf(has, res) {
   }
 }
 
-// Task 3 – Delete Button
+// TASK 3 — Conditional rendering & DueBadge label logic
 {
-  if (!taskApp || !taskList || !taskItem) {
+  if (!courseCard || !taskItem || !dueBadge) {
     const missingFiles = [];
-    if (!taskApp) missingFiles.push("TaskApp.jsx");
-    if (!taskList) missingFiles.push("TaskList.jsx");
+    if (!courseCard) missingFiles.push("CourseCard.jsx");
     if (!taskItem) missingFiles.push("TaskItem.jsx");
-    failTask(tasks[2], `Missing key React files: ${missingFiles.join(", ")}.`);
+    if (!dueBadge) missingFiles.push("DueBadge.jsx");
+    failTask(tasks[2], `Missing key files: ${missingFiles.join(", ")}.`);
   } else {
-    const hasA = mkHas(taskApp);
-    const hasL = mkHas(taskList);
+    const hasC = mkHas(courseCard);
     const hasI = mkHas(taskItem);
+    const hasD = mkHas(dueBadge);
 
     const required = [
+      // CourseCard: "All caught up" shown only when has tasks AND all done (we just check && and phrase)
       {
-        label: "Delete handler exists and removes task via filter (setTasks(prev => prev.filter(...)))",
-        ok: anyOf(hasA, [
-          /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*prev\s*\.\s*filter\s*\(/i,
-          /\bsetTasks\s*\(\s*prev\s*=>\s*prev\s*\.\s*filter\s*\(/i,
-          /\bfilter\s*\(\s*\w+\s*=>\s*\w+\.id\s*!==\s*\w+\s*\)/i,
-        ]),
+        label: 'CourseCard shows "All caught up" using logical && (top-level check)',
+        ok: anyOf(hasC, [
+          /All\s*caught\s*up/i,
+          /caught\s*up/i,
+        ]) && anyOf(hasC, [/\&\&/]),
       },
+      // CourseCard: "No tasks yet" when course.tasks.length === 0 && ...
       {
-        label: "Passes delete callback to TaskList (onDelete={...})",
-        ok: anyOf(hasA, [/<\s*TaskList[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}/i]),
+        label: 'CourseCard shows "No tasks" message when no tasks (&& + length check or similar)',
+        ok: anyOf(hasC, [
+          /\bcourse\s*\.\s*tasks\s*\.\s*length\s*===\s*0\s*\&\&/i,
+          /\bcourse\s*\.\s*tasks\s*\.\s*length\s*==\s*0\s*\&\&/i,
+          /\bcourse\s*\.\s*tasks\s*\.\s*length\s*\)\s*===\s*0/i,
+          /No\s+tasks/i,
+        ]) && anyOf(hasC, [/\&\&/]),
       },
+      // TaskItem: {!task.isDone && <DueBadge dueDate={task.dueDate} />}
       {
-        label: "TaskList passes onDelete to TaskItem",
-        ok: anyOf(hasL, [/<\s*TaskItem[^>]*\bonDelete\s*=\s*\{\s*\w+\s*\}/i]),
-      },
-      {
-        label: "TaskItem Delete button calls onDelete(id) (task.id or prop id)",
+        label: "TaskItem shows <DueBadge /> only when task is NOT done (&&)",
         ok: anyOf(hasI, [
-          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
-          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i,
-          /<\s*button[^>]*>[\s\S]*Delete[\s\S]*<\s*\/\s*button\s*>/i, // super lenient presence
+          /!\s*task\s*\.\s*isDone\s*\&\&\s*<\s*DueBadge/i,
+          /\{\s*!\s*task\s*\.\s*isDone\s*\&\&\s*<\s*DueBadge/i,
         ]),
+      },
+      // DueBadge: label logic strings exist + daysUntil used
+      {
+        label: 'DueBadge implements label logic (uses daysUntil + "Overdue"/"Due today"/"Due in")',
+        ok: anyOf(hasD, [
+          /\bdaysUntil\s*\(\s*dueDate\s*\)/i,
+          /\bdaysUntil\s*\(\s*\w+\s*\)/i,
+        ]) &&
+          anyOf(hasD, [/Overdue/i]) &&
+          anyOf(hasD, [/Due\s*today/i]) &&
+          anyOf(hasD, [/Due\s*in/i]),
+      },
+      // DueBadge: returns span using a variable label (not the starter "Label here")
+      {
+        label: "DueBadge returns the computed label (not placeholder text)",
+        ok: !anyOf(hasD, [/Label\s+here/i]) && anyOf(hasD, [/<\s*span[^>]*className\s*=\s*["']badge["'][^>]*>/i]),
       },
     ];
 
@@ -535,38 +515,55 @@ function anyOf(has, res) {
   }
 }
 
-// Task 4 – Clear All Button
+// TASK 4 — Toggle + Delete (CourseCard) and handlers wiring (TaskItem)
 {
-  if (!taskApp || !taskList) {
+  if (!courseCard || !taskItem) {
     const missingFiles = [];
-    if (!taskApp) missingFiles.push("TaskApp.jsx");
-    if (!taskList) missingFiles.push("TaskList.jsx");
-    failTask(tasks[3], `Missing key React files: ${missingFiles.join(", ")}.`);
+    if (!courseCard) missingFiles.push("CourseCard.jsx");
+    if (!taskItem) missingFiles.push("TaskItem.jsx");
+    failTask(tasks[3], `Missing key files: ${missingFiles.join(", ")}.`);
   } else {
-    const hasA = mkHas(taskApp);
-    const hasL = mkHas(taskList);
+    const hasC = mkHas(courseCard);
+    const hasI = mkHas(taskItem);
 
     const required = [
+      // CourseCard toggleTask uses onMutateCourse + map + isDone flip
       {
-        label: "Clear All resets tasks to empty array (setTasks([]))",
-        ok: anyOf(hasA, [/\bsetTasks\s*\(\s*\[\s*\]\s*\)/i]),
+        label: "CourseCard toggleTask implemented using onMutateCourse + .map() + toggles isDone",
+        ok: anyOf(hasC, [/\bfunction\s+toggleTask\s*\(/i]) &&
+          anyOf(hasC, [/\bonMutateCourse\s*\(/i]) &&
+          anyOf(hasC, [/\.\s*map\s*\(/i]) &&
+          anyOf(hasC, [/\bisDone\b/i]) &&
+          anyOf(hasC, [/!\s*\w*\.?\s*isDone/i, /\bisDone\s*:\s*!\s*\w*\.?\s*isDone/i]),
       },
+      // CourseCard deleteTask uses onMutateCourse + filter by id
       {
-        label: "Clear All button has onClick handler",
-        ok: anyOf(hasA, [
-          /Clear\s*All/i,
-          /<\s*button[^>]*\bonClick\s*=\s*\{/i,
-        ]),
+        label: "CourseCard deleteTask implemented using onMutateCourse + .filter() by id",
+        ok: anyOf(hasC, [/\bfunction\s+deleteTask\s*\(/i]) &&
+          anyOf(hasC, [/\bonMutateCourse\s*\(/i]) &&
+          anyOf(hasC, [/\.\s*filter\s*\(/i]) &&
+          anyOf(hasC, [/\b\.id\b/i]) &&
+          anyOf(hasC, [/!==\s*\w+/i, /!=\s*\w+/i]),
       },
+      // TaskItem checkbox checked + onChange calls onToggle(task.id)
       {
-        label: "TaskList shows placeholder when tasks is empty (tasks.length === 0 / !tasks.length / ternary)",
-        ok: anyOf(hasL, [
-          /\btasks\s*\.\s*length\s*===\s*0/i,
-          /!\s*tasks\s*\.\s*length/i,
-          /\btasks\s*\?\s*[\s\S]*:\s*[\s\S]*/i,
-          /\bNo\s+tasks\b/i,
-          /\bempty\b/i,
-          /\bplaceholder\b/i,
+        label: "TaskItem checkbox is controlled (checked={task.isDone}) and calls onToggle(task.id) onChange",
+        ok: anyOf(hasI, [
+          /<\s*input[^>]*type\s*=\s*["']checkbox["'][^>]*checked\s*=\s*\{\s*task\s*\.\s*isDone\s*\}[^>]*>/i,
+          /checked\s*=\s*\{\s*task\s*\.\s*isDone\s*\}/i,
+        ]) &&
+          anyOf(hasI, [
+            /onChange\s*=\s*\{\s*\(\s*\)\s*=>\s*onToggle\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
+            /onChange\s*=\s*\{\s*\w+\s*=>\s*onToggle\s*\(\s*\w+\.id\s*\)\s*\}/i,
+            /onChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*onToggle\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
+          ]),
+      },
+      // TaskItem delete button calls onDelete(task.id)
+      {
+        label: "TaskItem delete button calls onDelete(task.id) onClick",
+        ok: anyOf(hasI, [
+          /onClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
+          /onClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i,
         ]),
       },
     ];
@@ -584,7 +581,7 @@ const totalScore = round2(stepsScore + submissionScore);
 /* -----------------------------
    Build summary + feedback (same style)
 -------------------------------- */
-const LAB_NAME = "react-task-tracker";
+const LAB_NAME = "5-4-react-rendering-lists-main";
 
 const submissionLine = `- **Lab:** ${LAB_NAME}
 - **Deadline (Riyadh / UTC+03:00):** ${DEADLINE_RIYADH_ISO}
@@ -602,9 +599,10 @@ ${submissionLine}
 
 - Repo root (cwd): ${REPO_ROOT}
 - Detected project root: ${PROJECT_ROOT}
-- TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
-- TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
+- App: ${appFile ? `✅ ${appFile}` : "❌ App.jsx not found"}
+- CourseCard: ${courseCardFile ? `✅ ${courseCardFile}` : "❌ CourseCard.jsx not found"}
 - TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
+- DueBadge: ${dueBadgeFile ? `✅ ${dueBadgeFile}` : "❌ DueBadge.jsx not found"}
 
 ## Marks Breakdown
 
@@ -668,9 +666,10 @@ ${submissionLine}
 
 - Repo root (cwd): ${REPO_ROOT}
 - Detected project root: ${PROJECT_ROOT}
-- TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
-- TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
+- App: ${appFile ? `✅ ${appFile}` : "❌ App.jsx not found"}
+- CourseCard: ${courseCardFile ? `✅ ${courseCardFile}` : "❌ CourseCard.jsx not found"}
 - TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
+- DueBadge: ${dueBadgeFile ? `✅ ${dueBadgeFile}` : "❌ DueBadge.jsx not found"}
 
 ---
 
@@ -694,7 +693,7 @@ feedback += `
 
 ## How marks were deducted (rules)
 
-- JS/JSX comments are ignored (so examples in comments do NOT count).
+- JS/JSX comments are ignored (so starter TODO comments do NOT count).
 - Checks are intentionally light: they look for key constructs and basic structure.
 - Code can be in ANY order; repeated code is allowed.
 - Common equivalents are accepted, and naming is flexible.
