@@ -11,23 +11,15 @@ export default function CourseCard({ course, index, onMutateCourse }) {
 
   function toggleTask(id) {
     // TODO (TASK 4): toggle task.isDone for the task with matching id
-    onMutateCourse(index, (tasks) =>
-      tasks.map((task) =>
-        task.id === id ? { ...task, isDone: !task.isDone } : task
-      )
-    );
   }
 
   function deleteTask(id) {
     // TODO (TASK 4): remove the task with matching id
-    onMutateCourse(index, (tasks) =>
-      tasks.filter((task) => task.id !== id)
-    );
   }
 
   // Helpful hints for TASK 3 (optional to use)
-  const hasTasks = course.tasks.length > 0;
-  const allDone = hasTasks && course.tasks.every((t) => t.isDone);
+  // const hasTasks = course.tasks.length > 0;
+  // const allDone = hasTasks && course.tasks.every(t => t.isDone);
 
   return (
     <article className="course card">
@@ -38,13 +30,11 @@ export default function CourseCard({ course, index, onMutateCourse }) {
             - course has tasks AND
             - all tasks are done
             Use logical && */}
-        {allDone && <span className="badge success">All caught up</span>}
       </header>
 
       <section className="tasksSection">
 
         {/* DISPLAY ONLY: Show a message when there are no tasks */}
-        {!hasTasks && <p className="muted">No tasks yet.</p>}
         
         <ul className="tasks">
           {/* TODO (TASK 2): Render tasks using course.tasks.map(...)
@@ -54,14 +44,6 @@ export default function CourseCard({ course, index, onMutateCourse }) {
                 - onToggle={toggleTask}
                 - onDelete={deleteTask}
           */}
-          {course.tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              onToggle={toggleTask}
-              onDelete={deleteTask}
-            />
-          ))}
         </ul>
       </section>
     </article>
