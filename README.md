@@ -2,9 +2,7 @@
 # Study Buddy — React Lab
 
 > **Note:**
-> Please follow the `app.jsx` file to implement the TODOs.
->
-> Please use app.jsx file to perform TODOs and follow the steps strictly to gain good marks in the assignment.  
+> Please use App.jsx file to perform TODOs and follow the steps strictly to gain good marks in the assignment.  
 >  
 > **Due Date:** 25 Feb, 2026, **11:59 PM**
 >
