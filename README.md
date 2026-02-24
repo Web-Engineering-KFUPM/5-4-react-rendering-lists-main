@@ -4,7 +4,7 @@
 > **Note:**
 > Please use App.jsx file to perform TODOs and follow the steps strictly to gain good marks in the assignment.  
 >  
-> **Due Date:** 25 Feb, 2026, **11:59 PM**
+> **Due Date:** 25 Feb, 2026, **08:59 PM**
 >
 > Other component files (`CourseCard.jsx`, `TaskItem.jsx`, `DueBadge.jsx`) are intentionally left clean for you to    complete.
 
